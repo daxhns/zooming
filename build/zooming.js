@@ -180,6 +180,11 @@ var api = {
     img.onload = function () {
       imgRect = target.getBoundingClientRect();
 
+      //-- BLOGIN: Add true dimensions of the currently displayed image
+      imgRect.imgWidth = img.width;
+      imgRect.imgHeight = img.height;
+
+
       // upgrade source if possible
       if (target.hasAttribute('data-original')) {
         srcThumbnail = target.getAttribute('src');
@@ -331,24 +336,87 @@ function calculateTransform() {
     y: window.innerHeight / 2
   };
 
+
+ 
+//-- BLOGIN: limit max zoom to original image width and height
+  if (target.hasAttribute('data-original')) {
+    var original_width = target.getAttribute('data-o-w');   // get original image width from data-o-w attribute of hi-res image
+    var original_height = target.getAttribute('data-o-h');   // get original image height from data-o-h attribute of hi-res image
+  }
+  else{
+    var original_width = imgRect.imgWidth;   // get original image width from currently displayed image
+    var original_height = imgRect.imgHeight;   // get original image height from currently displayed image
+  }
+
+
+
+  var scale_to_use = options.scaleBase;
+  if (original_width > 0 || original_height > 0){     // should be always true if data-o-w and data-o-h attriutes are present with every data-original attribute
+
+    //console.log('window innerWidth: ' + window.innerWidth);
+    //console.log('window innerHeight: ' + window.innerHeight);
+
+    //console.log('original image w: ' + original_width);
+    //console.log('original image h: ' + original_height);
+
+    if (original_width < window.innerWidth && original_height < window.innerHeight){      // original, full sized image is smaller than screen
+      var x_distance_to_edge = original_width;
+      var y_distance_to_edge = original_height;
+      scale_to_use = 1;      // reset scale to 1, image is small enough to fit whole on screen, do not scale it down
+    }
+    else{     // original image will not fit on screen, limit to screen size
+      var x_distance_to_edge = window.innerWidth;
+      var y_distance_to_edge = window.innerHeight;
+    }
+    //--
+
+    var distFromImageEdgeToWindowEdge = {
+      x: x_distance_to_edge / 2 - imgHalfWidth,
+      y: y_distance_to_edge / 2 - imgHalfHeight
+    }
+
+  }
+  else{     // original image dimensions could not be determined, scale to full screen (original zooming behaviour)
+
+    // The distance between image edge and window edge
+    var distFromImageEdgeToWindowEdge = {
+        x: windowCenter.x - imgHalfWidth,
+        y: windowCenter.y - imgHalfHeight
+    }
+
+}
+//-- end BLOGIN update
+
+/*
   // The distance between image edge and window edge
   var distFromImageEdgeToWindowEdge = {
     x: windowCenter.x - imgHalfWidth,
     y: windowCenter.y - imgHalfHeight
   };
+*/
 
   var scaleHorizontally = distFromImageEdgeToWindowEdge.x / imgHalfWidth;
   var scaleVertically = distFromImageEdgeToWindowEdge.y / imgHalfHeight;
 
   // The vector to translate image to the window center
   translate = {
-    x: windowCenter.x - imgCenter.x,
-    y: windowCenter.y - imgCenter.y
+    x: Math.round(windowCenter.x - imgCenter.x),      // BLOGIN: force translate to full pixels (avoid .5 )
+    y: Math.round(windowCenter.y - imgCenter.y)
   };
 
   // The additional scale is based on the smaller value of
   // scaling horizontally and scaling vertically
-  scale = options.scaleBase + Math.min(scaleHorizontally, scaleVertically);
+
+
+  //-- calculate scale
+  if (scaleHorizontally == -1)    // image width was not supplied (data-o-w missing)
+    scale = scaleVertically;
+  else if (scaleVertically == -1)   // image height was not supplied (data-o-h missing)
+    scale = scaleHorizontally;
+  else                        // both image width and height were supplied, take smaller, to fit viewport
+    scale = Math.min(scaleHorizontally, scaleVertically);
+  
+  scale = options.scaleBase + scale;    // apply scale factor
 
   return 'translate(' + translate.x + 'px, ' + translate.y + 'px) scale(' + scale + ')';
 }
