@@ -677,4 +677,4 @@ document.addEventListener('DOMContentLoaded', api.listen(options.defaultZoomable
 return api;
 
 })));
-//# sourceMappingURL=zooming.js.map
+
