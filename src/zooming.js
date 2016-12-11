@@ -1,4 +1,4 @@
-import { prefix, PRESS_DELAY, TOUCH_SCALE_FACTOR, options, sniffTransition, checkTrans } from './helpers'
+import { prefix, PRESS_DELAY, TOUCH_SCALE_FACTOR, options, sniffTransition, checkTrans, updateSrc } from './helpers'
 
 // elements
 const body    = document.body
@@ -12,7 +12,7 @@ let press = false
 let grab  = false
 let multitouch = false
 let lastScrollPosition = null
-let translate, scale, imgRect, srcThumbnail, pressTimer, dynamicScaleExtra
+let translate, scale, srcThumbnail, pressTimer, dynamicScaleExtra
 
 // style
 const style = {
@@ -85,40 +85,26 @@ const api = {
     lock = true
     parent = target.parentNode
 
-    const img = new Image()
-    img.src = target.getAttribute('src')
-    img.onload = () => {
-      imgRect = target.getBoundingClientRect()
+    // force layout update
+    target.offsetWidth
 
-      // upgrade source if possible
-      if (target.hasAttribute('data-original')) {
-        srcThumbnail = target.getAttribute('src')
-
-        setStyle(target, {
-          width: `${imgRect.width}px`,
-          height: `${imgRect.height}px`
-        })
-
-        target.setAttribute('src', target.getAttribute('data-original'))
-      }
-
-      // force layout update
-      target.offsetWidth
-
-      style.open = {
-        position: 'relative',
-        zIndex: 999,
-        cursor: `${prefix}${options.enableGrab ? 'grab' : 'zoom-out'}`,
-        transition: `${transformCssProp}
-          ${options.transitionDuration}s
-          ${options.transitionTimingFunction}`,
-        transform: calculateTransform()
-      }
-
-      // trigger transition
-      style.close = setStyle(target, style.open, true)
+    // upgrade source if possible
+    if (target.hasAttribute('data-original')) {
+      srcThumbnail = updateSrc(target, target.getAttribute('data-original'))
     }
 
+    style.open = {
+      position: 'relative',
+      zIndex: 999,
+      cursor: `${prefix}${options.enableGrab ? 'grab' : 'zoom-out'}`,
+      transition: `${transformCssProp}
+        ${options.transitionDuration}s
+        ${options.transitionTimingFunction}`,
+      transform: calculateTransform()
+    }
+
+    // trigger transition
+    style.close = setStyle(target, style.open, true)
 
     parent.appendChild(overlay)
     setTimeout(() => overlay.style.opacity = options.bgOpacity, 30)
@@ -160,11 +146,14 @@ const api = {
       lock = false
       grab = false
 
-      setStyle(target, style.close)
-      parent.removeChild(overlay)
+      // force layout update
+      target.offsetWidth
 
       // downgrade source if possible
-      if (target.hasAttribute('data-original')) target.setAttribute('src', srcThumbnail)
+      if (target.hasAttribute('data-original')) updateSrc(target, srcThumbnail)
+
+      setStyle(target, style.close)
+      parent.removeChild(overlay)
 
       if (cb) cb(target)
     })
@@ -224,6 +213,7 @@ function setStyle(el, styles, remember) {
 }
 
 function calculateTransform () {
+  const imgRect = target.getBoundingClientRect()
   const [imgHalfWidth, imgHalfHeight] = [imgRect.width / 2, imgRect.height / 2]
 
   const imgCenter = {
@@ -395,7 +385,7 @@ setStyle(overlay, {
     ${options.transitionTimingFunction}`
 })
 
-overlay.addEventListener('click', api.close)
-document.addEventListener('DOMContentLoaded', api.listen(options.defaultZoomable))
+overlay.addEventListener('click', () => api.close())
+document.addEventListener('DOMContentLoaded', () => api.listen(options.defaultZoomable))
 
 export default api
