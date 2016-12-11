@@ -2,7 +2,7 @@
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
   typeof define === 'function' && define.amd ? define(factory) :
   (global.Zooming = factory());
-}(this, (function () { 'use strict';
+}(this, (function () { /*'use strict';*/
 
 // webkit prefix
 var prefix = 'WebkitAppearance' in document.documentElement.style ? '-webkit-' : '';
@@ -175,14 +175,15 @@ var api = {
     lock = true;
     parent = target.parentNode;
 
+    /*
     var img = new Image();
     img.src = target.getAttribute('src');
     img.onload = function () {
       imgRect = target.getBoundingClientRect();
 
       //-- BLOGIN: Add true dimensions of the currently displayed image
-      imgRect.imgWidth = img.width;
-      imgRect.imgHeight = img.height;
+      //imgRect.imgWidth = img.width;
+      //imgRect.imgHeight = img.height;
 
 
       // upgrade source if possible
@@ -196,7 +197,7 @@ var api = {
 
         target.setAttribute('src', target.getAttribute('data-original'));
       }
-
+      
       // force layout update
       target.offsetWidth;
 
@@ -210,7 +211,82 @@ var api = {
 
       // trigger transition
       style.close = setStyle$1(target, style.open, true);
-    };
+    };    //img.onload
+*/
+
+
+  //-------------- moved outside img.onload
+
+      imgRect = target.getBoundingClientRect();
+
+      // upgrade source if possible
+      if (target.hasAttribute('data-original')) {
+        srcThumbnail = target.getAttribute('src');
+
+        setStyle$1(target, {
+          width: imgRect.width + 'px',
+          height: imgRect.height + 'px'
+        });
+
+        //-- BLOGIN - add loading indicator while loading hi-res image
+        
+        //target.setAttribute('src', target.getAttribute('data-original'));   // moved to onload to prevent image flicker on firefox
+
+        $(overlay).addClass("small_loading_indicator");   // add loading indicator, jquery used
+
+        temp_hires_img = new Image();
+        //var img = document.createElement('img')
+        var data_original =  target.getAttribute('data-original');
+        temp_hires_img.onload = function () {
+          //console.log('img.onload');
+          
+          if(navigator.userAgent.toLowerCase().indexOf('firefox') > -1){
+            
+            //console.log("FIREFOX");
+
+            var $target_clone = $(target).clone();
+            $target_clone.attr('src', data_original);
+            $target_clone.css("position", "absolute");
+            //$target_clone.css("left", window.innerWidth);     // no need
+            //$target_clone.css("top", window.innerHeight);     // no need
+            $target_clone.css("zIndex", 0);       // important
+          
+            $('body').after($target_clone);
+
+            setTimeout(function(){ target.setAttribute('src', data_original); $target_clone.remove(); }, 200);
+          
+          }
+          else{     // modern browsers
+            target.setAttribute('src', data_original);
+          }
+        
+          $(overlay).removeClass("small_loading_indicator");
+
+          temp_hires_img = null;      // clear temp hi-res image, it has been loaded and inserted
+
+        }   // img.onload
+
+        temp_hires_img.src = data_original;      // triger loading hi-res image
+
+      }
+     
+      
+      // force layout update
+      target.offsetWidth;
+
+      style.open = {
+        position: 'relative',
+        zIndex: 999,
+        cursor: '' + prefix + (options.enableGrab ? 'grab' : 'zoom-out'),
+        transition: transformCssProp + '\n          ' + options.transitionDuration + 's\n          ' + options.transitionTimingFunction,
+        transform: calculateTransform()
+      };
+
+      // trigger transition
+      style.close = setStyle$1(target, style.open, true);
+
+  //----------------- outside img.onload
+
 
     parent.appendChild(overlay);
     setTimeout(function () {
@@ -234,6 +310,16 @@ var api = {
   },
 
   close: function close() {
+    
+    //console.log(typeof temp_hires_img);
+    //console.log(temp_hires_img);
+    //-- abort image loading if currently in progress, to prevent firing onload event for 
+    if (typeof temp_hires_img != 'undefined' && temp_hires_img ) {       // if this exists then loading of hi-res image is in progress..
+      temp_hires_img.src='';      // abort loading hi-res image, abort onload event also
+      $(overlay).removeClass("small_loading_indicator");
+      //console.log('aborting loading of hi-res image...');
+    }
+    
     var cb = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : options.onClose;
 
     if (!shown || lock || _grab) return;
@@ -242,7 +328,8 @@ var api = {
     // onBeforeClose event
     if (options.onBeforeClose) options.onBeforeClose(target);
     overlay.style.opacity = 0;
-    setStyle$1(target, { transform: '' });
+    setStyle$1(target, { transform: 'none' }); 
+    
 
     document.removeEventListener('scroll', scrollHandler);
     document.removeEventListener('keydown', keydownHandler);
@@ -322,6 +409,13 @@ function setStyle$1(el, styles, remember) {
 }
 
 function calculateTransform() {
+
+  //console.log('calculateTransform');
+  //console.log( target);
+  //console.log( target.naturalWidth);
+  //console.log( target.naturalHeight);
+
+
   var imgHalfWidth = imgRect.width / 2,
       imgHalfHeight = imgRect.height / 2;
 
@@ -340,12 +434,15 @@ function calculateTransform() {
  
 //-- BLOGIN: limit max zoom to original image width and height
   if (target.hasAttribute('data-original')) {
+    //-- this is done to prevent waiting for the hires image to load to get its dimensions
     var original_width = target.getAttribute('data-o-w');   // get original image width from data-o-w attribute of hi-res image
     var original_height = target.getAttribute('data-o-h');   // get original image height from data-o-h attribute of hi-res image
   }
-  else{
-    var original_width = imgRect.imgWidth;   // get original image width from currently displayed image
-    var original_height = imgRect.imgHeight;   // get original image height from currently displayed image
+  else{   // get image dimensions from currenrtly displayed image
+    //var original_width = imgRect.imgWidth;   // get original image width from currently displayed image
+    //var original_height = imgRect.imgHeight;   // get original image height from currently displayed image
+    var original_width = target.naturalWidth;
+    var original_height = target.naturalHeight;
   }
 
 
@@ -549,7 +646,7 @@ function touchendHandler(e) {
 // init ------------------------------------------------------------------------
 setStyle$1(overlay, {
   zIndex: 998,
-  background: options.bgColor,
+  backgroundColor: options.bgColor,
   position: 'fixed',
   top: 0,
   left: 0,
@@ -559,9 +656,24 @@ setStyle$1(overlay, {
   transition: 'opacity\n    ' + options.transitionDuration + 's\n    ' + options.transitionTimingFunction
 });
 
-overlay.addEventListener('click', api.close);
+//overlay.addEventListener('click', api.close);
+//document.addEventListener('DOMContentLoaded', api.listen(options.defaultZoomable));
+
+overlay.addEventListener('click', function(){ return api.close(); });
 document.addEventListener('DOMContentLoaded', api.listen(options.defaultZoomable));
 
+ /*
+  overlay.addEventListener('click', function () {
+    console.log('test');
+    return api.close();
+  });
+
+ document.addEventListener('DOMContentLoaded', function () {
+  console.log(options);
+  return api.listen(options.defaultZoomable);
+ });
+
+*/
 return api;
 
 })));
