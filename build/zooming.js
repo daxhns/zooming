@@ -7,26 +7,20 @@
 // webkit prefix
 var prefix = 'WebkitAppearance' in document.documentElement.style ? '-webkit-' : '';
 var PRESS_DELAY = 200;
-var TOUCH_SCALE_FACTOR = 2;
 
 var options = {
   defaultZoomable: 'img[data-action="zoom"]',
-  enableGrab: true,
+  /*enableGrab: true, //removed */
   transitionDuration: 0.4,
   transitionTimingFunction: 'cubic-bezier(.4,0,0,1)',
   bgColor: '#fff',
   bgOpacity: 1,
   scaleBase: 1.0,
-  scaleExtra: 0.5,
   scrollThreshold: 40,
   onOpen: null,
   onClose: null,
-  onGrab: null,
-  onRelease: null,
   onBeforeOpen: null,
-  onBeforeClose: null,
-  onBeforeGrab: null,
-  onBeforeRelease: null
+  onBeforeClose: null
 };
 
 var sniffTransition = function sniffTransition(el) {
@@ -96,15 +90,13 @@ var parent = void 0;
 var shown = false;
 var lock = false;
 var press = false;
-var _grab = false;
-var multitouch = false;
+
 var lastScrollPosition = null;
 var translate = void 0;
 var scale = void 0;
 var imgRect = void 0;
 var srcThumbnail = void 0;
 var pressTimer = void 0;
-var dynamicScaleExtra = void 0;
 
 // style
 var style = {
@@ -162,7 +154,7 @@ var api = {
   open: function open(el) {
     var cb = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : options.onOpen;
 
-    if (shown || lock || _grab) return;
+    if (shown || lock ) return;
 
     target = typeof el === 'string' ? document.querySelector(el) : el;
 
@@ -175,74 +167,72 @@ var api = {
     lock = true;
     parent = target.parentNode;
 
+    //-------------- moved outside img.onload
 
+    imgRect = target.getBoundingClientRect();
 
-  //-------------- moved outside img.onload
+    // upgrade source if possible
+    if (target.hasAttribute('data-original')) {
+      srcThumbnail = target.getAttribute('src');
 
-      imgRect = target.getBoundingClientRect();
+      setStyle$1(target, {
+        width: imgRect.width + 'px',
+        height: imgRect.height + 'px'
+      });
 
-      // upgrade source if possible
-      if (target.hasAttribute('data-original')) {
-        srcThumbnail = target.getAttribute('src');
+      //-- BLOGIN - add loading indicator while loading hi-res image
+      $(overlay).addClass("small_loading_indicator");   // add loading indicator, jquery used
 
-        setStyle$1(target, {
-          width: imgRect.width + 'px',
-          height: imgRect.height + 'px'
-        });
-
-        //-- BLOGIN - add loading indicator while loading hi-res image
-        $(overlay).addClass("small_loading_indicator");   // add loading indicator, jquery used
-
-        temp_hires_img = new Image();
-        //var img = document.createElement('img')
-        var data_original =  target.getAttribute('data-original');
-        temp_hires_img.onload = function () {
-          //console.log('img.onload');
-          
-          if(navigator.userAgent.toLowerCase().indexOf('firefox') > -1){    // fix image flicker in firefox, when changing src to original, hi-res image
-            
-            //console.log("FIREFOX");
-            //-- create clone element
-            var $target_clone = $(target).clone();
-            $target_clone.attr('src', data_original);
-            $target_clone.css("position", "absolute");
-            $target_clone.css("zIndex", 0);       // important
-          
-            $('body').after($target_clone);
-
-            setTimeout(function(){ target.setAttribute('src', data_original); $target_clone.remove(); }, 200);      // update real image and remove inserted clone element
-          
-          }
-          else{     // modern browsers, not firefox
-            target.setAttribute('src', data_original);
-          }
+      temp_hires_img = new Image();
+      //var img = document.createElement('img')
+      var data_original =  target.getAttribute('data-original');
+      temp_hires_img.onload = function () {
+        //console.log('img.onload');
         
-          $(overlay).removeClass("small_loading_indicator");
+        if(navigator.userAgent.toLowerCase().indexOf('firefox') > -1){    // fix image flicker in firefox, when changing src to original, hi-res image
+          
+          //console.log("FIREFOX");
+          //-- create clone element
+          var $target_clone = $(target).clone();
+          $target_clone.attr('src', data_original);
+          $target_clone.css("position", "absolute");
+          $target_clone.css("zIndex", 0);       // important
+        
+          $('body').after($target_clone);
 
-          temp_hires_img = null;      // clear temp hi-res image, it has been loaded and inserted
-
-        }   // img.onload
-
-        temp_hires_img.src = data_original;      // triger loading hi-res image
-
-      }
-     
+          setTimeout(function(){ target.setAttribute('src', data_original); $target_clone.remove(); }, 200);      // update real image and remove inserted clone element
+        
+        }
+        else{     // modern browsers, not firefox
+          target.setAttribute('src', data_original);
+        }
       
-      // force layout update
-      target.offsetWidth;
+        $(overlay).removeClass("small_loading_indicator");
 
-      style.open = {
-        position: 'relative',
-        zIndex: 999,
-        cursor: '' + prefix + (options.enableGrab ? 'grab' : 'zoom-out'),
-        transition: transformCssProp + '\n          ' + options.transitionDuration + 's\n          ' + options.transitionTimingFunction,
-        transform: calculateTransform()
-      };
+        temp_hires_img = null;      // clear temp hi-res image, it has been loaded and inserted
 
-      // trigger transition
-      style.close = setStyle$1(target, style.open, true);
+      }   // img.onload
 
-  //----------------- outside img.onload
+      temp_hires_img.src = data_original;      // triger loading hi-res image
+
+    }
+   
+    
+    // force layout update
+    target.offsetWidth;
+
+    style.open = {
+      position: 'relative',
+      zIndex: 999,
+      cursor: '' + prefix + 'zoom-out',
+      transition: transformCssProp + '\n          ' + options.transitionDuration + 's\n          ' + options.transitionTimingFunction,
+      transform: calculateTransform()
+    };
+
+    // trigger transition
+    style.close = setStyle$1(target, style.open, true);
+
+    //----------------- outside img.onload
 
 
     parent.appendChild(overlay);
@@ -256,7 +246,7 @@ var api = {
     target.addEventListener(transEndEvent, function onEnd() {
       target.removeEventListener(transEndEvent, onEnd);
 
-      if (options.enableGrab) addGrabListeners(target);
+      //if (options.enableGrab) addGrabListeners(target);   // removed
 
       lock = false;
 
@@ -280,7 +270,7 @@ var api = {
     
     var cb = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : options.onClose;
 
-    if (!shown || lock || _grab) return;
+    if (!shown || lock ) return;
     lock = true;
 
     // onBeforeClose event
@@ -295,11 +285,11 @@ var api = {
     target.addEventListener(transEndEvent, function onEnd() {
       target.removeEventListener(transEndEvent, onEnd);
 
-      if (options.enableGrab) removeGrabListeners(target);
+      //if (options.enableGrab) removeGrabListeners(target);    // removed
 
       shown = false;
       lock = false;
-      _grab = false;
+      
 
       setStyle$1(target, style.close);
       parent.removeChild(overlay);
@@ -313,51 +303,7 @@ var api = {
     return _this;
   },
 
-  grab: function grab(x, y, start) {
-    var cb = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : options.onGrab;
-
-    if (!shown || lock) return;
-    _grab = true;
-
-    // onBeforeGrab event
-    if (options.onBeforeGrab) options.onBeforeGrab(target);
-
-    var dx = window.innerWidth / 2 - x,
-        dy = window.innerHeight / 2 - y;
-
-    var scaleExtra = multitouch ? dynamicScaleExtra : options.scaleExtra;
-    var transform = target.style.transform.replace(/translate\(.*?\)/i, 'translate(' + (translate.x + dx) + 'px, ' + (translate.y + dy) + 'px)').replace(/scale\([0-9|\.]*\)/i, 'scale(' + (scale + scaleExtra) + ')');
-
-    setStyle$1(target, {
-      cursor: 'move',
-      transition: transformCssProp + ' ' + (start ? options.transitionDuration + 's ' + options.transitionTimingFunction : 'ease'),
-      transform: transform
-    });
-
-    target.addEventListener(transEndEvent, function onEnd() {
-      target.removeEventListener(transEndEvent, onEnd);
-      if (cb) cb(target);
-    });
-  },
-
-  release: function release() {
-    var cb = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : options.onRelease;
-
-    if (!shown || lock || !_grab) return;
-
-    // onBeforeRelease event
-    if (options.onBeforeRelease) options.onBeforeRelease(target);
-
-    setStyle$1(target, style.open);
-
-    target.addEventListener(transEndEvent, function onEnd() {
-      target.removeEventListener(transEndEvent, onEnd);
-      _grab = false;
-      if (cb) cb(target);
-    });
-
-    return _this;
-  }
+ 
 };
 
 // -----------------------------------------------------------------------------
@@ -370,9 +316,6 @@ function calculateTransform() {
 
   //console.log('calculateTransform');
   //console.log( target);
-  //console.log( target.naturalWidth);
-  //console.log( target.naturalHeight);
-
 
   var imgHalfWidth = imgRect.width / 2,
       imgHalfHeight = imgRect.height / 2;
@@ -397,19 +340,14 @@ function calculateTransform() {
     var original_height = target.getAttribute('data-o-h');   // get original image height from data-o-h attribute of hi-res image
   }
   else{   // get image dimensions from currenrtly displayed image
-    //var original_width = imgRect.imgWidth;   // get original image width from currently displayed image
-    //var original_height = imgRect.imgHeight;   // get original image height from currently displayed image
-    var original_width = target.naturalWidth;
+
+    var original_width = target.naturalWidth;     // get original image width from currently displayed image
     var original_height = target.naturalHeight;
   }
 
 
-
   var scale_to_use = options.scaleBase;
   if (original_width > 0 || original_height > 0){     // should be always true if data-o-w and data-o-h attriutes are present with every data-original attribute
-
-    //console.log('window innerWidth: ' + window.innerWidth);
-    //console.log('window innerHeight: ' + window.innerHeight);
 
     //console.log('original image w: ' + original_width);
     //console.log('original image h: ' + original_height);
@@ -468,64 +406,7 @@ function calculateTransform() {
   return 'translate(' + translate.x + 'px, ' + translate.y + 'px) scale(' + scale + ')';
 }
 
-function addGrabListeners(el) {
-  el.addEventListener('mousedown', mousedownHandler);
-  el.addEventListener('mousemove', mousemoveHandler);
-  el.addEventListener('mouseup', mouseupHandler);
-  el.addEventListener('touchstart', touchstartHandler);
-  el.addEventListener('touchmove', touchmoveHandler);
-  el.addEventListener('touchend', touchendHandler);
-}
 
-function removeGrabListeners(el) {
-  el.removeEventListener('mousedown', mousedownHandler);
-  el.removeEventListener('mousemove', mousemoveHandler);
-  el.removeEventListener('mouseup', mouseupHandler);
-  el.removeEventListener('touchstart', touchstartHandler);
-  el.removeEventListener('touchmove', touchmoveHandler);
-  el.removeEventListener('touchend', touchendHandler);
-}
-
-function processTouches(touches, cb) {
-  var total = touches.length;
-
-  multitouch = total > 1;
-
-  var i = touches.length;
-  var xs = 0,
-      ys = 0;
-
-  // keep track of the min and max of touch positions
-
-  var minX = touches[0].clientX;
-  var minY = touches[0].clientY;
-  var maxX = touches[0].clientX;
-  var maxY = touches[0].clientY;
-
-  while (i--) {
-    var t = touches[i];
-    var x = t.clientX;
-    var y = t.clientY;
-    xs += x;
-    ys += y;
-
-    if (multitouch) {
-      if (x < minX) minX = x;else if (x > maxX) maxX = x;
-
-      if (y < minY) minY = y;else if (y > maxY) maxY = y;
-    }
-  }
-
-  if (multitouch) {
-    // change scaleExtra dynamically
-    var distX = maxX - minX,
-        distY = maxY - minY;
-
-    if (distX > distY) dynamicScaleExtra = distX / window.innerWidth * TOUCH_SCALE_FACTOR;else dynamicScaleExtra = distY / window.innerHeight * TOUCH_SCALE_FACTOR;
-  }
-
-  cb(xs / touches.length, ys / touches.length);
-}
 
 // listeners -----------------------------------------------------------------
 
@@ -547,51 +428,7 @@ function keydownHandler(e) {
   if (code === 'Escape' || e.keyCode === 27) api.close();
 }
 
-function mousedownHandler(e) {
-  e.preventDefault();
 
-  pressTimer = setTimeout(function () {
-    press = true;
-    api.grab(e.clientX, e.clientY, true);
-  }, PRESS_DELAY);
-}
-
-function mousemoveHandler(e) {
-  if (press) api.grab(e.clientX, e.clientY);
-}
-
-function mouseupHandler() {
-  clearTimeout(pressTimer);
-  press = false;
-  api.release();
-}
-
-function touchstartHandler(e) {
-  e.preventDefault();
-
-  pressTimer = setTimeout(function () {
-    press = true;
-    processTouches(e.touches, function (x, y) {
-      return api.grab(x, y, true);
-    });
-  }, PRESS_DELAY);
-}
-
-function touchmoveHandler(e) {
-  if (press) {
-    processTouches(e.touches, function (x, y) {
-      return api.grab(x, y);
-    });
-  }
-}
-
-function touchendHandler(e) {
-  if (e.targetTouches.length === 0) {
-    clearTimeout(pressTimer);
-    press = false;
-    if (_grab) api.release();else api.close();
-  }
-}
 
 // init ------------------------------------------------------------------------
 setStyle$1(overlay, {
