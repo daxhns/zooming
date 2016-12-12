@@ -1,6 +1,14 @@
+# Fork/customize for [Zooming.js](https://github.com/kingdido999/zooming) library 
+
+- limit maximum zoom to original image dimensions
+- loading indicator while original, hi-res image is loading
+
+[Demo](http://hnsmedia.net/zooming/)
+
+
 # Zooming
 
-Image zoom that makes sense. [Demo](http://desmonding.me/zooming/)
+Image zoom that makes sense. 
 
 - Pure JavaScript & built with mobile in mind.
 - Smooth animations with intuitive gestures.
