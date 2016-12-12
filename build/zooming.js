@@ -175,44 +175,6 @@ var api = {
     lock = true;
     parent = target.parentNode;
 
-    /*
-    var img = new Image();
-    img.src = target.getAttribute('src');
-    img.onload = function () {
-      imgRect = target.getBoundingClientRect();
-
-      //-- BLOGIN: Add true dimensions of the currently displayed image
-      //imgRect.imgWidth = img.width;
-      //imgRect.imgHeight = img.height;
-
-
-      // upgrade source if possible
-      if (target.hasAttribute('data-original')) {
-        srcThumbnail = target.getAttribute('src');
-
-        setStyle$1(target, {
-          width: imgRect.width + 'px',
-          height: imgRect.height + 'px'
-        });
-
-        target.setAttribute('src', target.getAttribute('data-original'));
-      }
-      
-      // force layout update
-      target.offsetWidth;
-
-      style.open = {
-        position: 'relative',
-        zIndex: 999,
-        cursor: '' + prefix + (options.enableGrab ? 'grab' : 'zoom-out'),
-        transition: transformCssProp + '\n          ' + options.transitionDuration + 's\n          ' + options.transitionTimingFunction,
-        transform: calculateTransform()
-      };
-
-      // trigger transition
-      style.close = setStyle$1(target, style.open, true);
-    };    //img.onload
-*/
 
 
   //-------------- moved outside img.onload
@@ -229,9 +191,6 @@ var api = {
         });
 
         //-- BLOGIN - add loading indicator while loading hi-res image
-        
-        //target.setAttribute('src', target.getAttribute('data-original'));   // moved to onload to prevent image flicker on firefox
-
         $(overlay).addClass("small_loading_indicator");   // add loading indicator, jquery used
 
         temp_hires_img = new Image();
@@ -240,23 +199,21 @@ var api = {
         temp_hires_img.onload = function () {
           //console.log('img.onload');
           
-          if(navigator.userAgent.toLowerCase().indexOf('firefox') > -1){
+          if(navigator.userAgent.toLowerCase().indexOf('firefox') > -1){    // fix image flicker in firefox, when changing src to original, hi-res image
             
             //console.log("FIREFOX");
-
+            //-- create clone element
             var $target_clone = $(target).clone();
             $target_clone.attr('src', data_original);
             $target_clone.css("position", "absolute");
-            //$target_clone.css("left", window.innerWidth);     // no need
-            //$target_clone.css("top", window.innerHeight);     // no need
             $target_clone.css("zIndex", 0);       // important
           
             $('body').after($target_clone);
 
-            setTimeout(function(){ target.setAttribute('src', data_original); $target_clone.remove(); }, 200);
+            setTimeout(function(){ target.setAttribute('src', data_original); $target_clone.remove(); }, 200);      // update real image and remove inserted clone element
           
           }
-          else{     // modern browsers
+          else{     // modern browsers, not firefox
             target.setAttribute('src', data_original);
           }
         
@@ -313,7 +270,8 @@ var api = {
     
     //console.log(typeof temp_hires_img);
     //console.log(temp_hires_img);
-    //-- abort image loading if currently in progress, to prevent firing onload event for 
+    
+    //-- abort image loading if currently in progress, to prevent firing onload event  
     if (typeof temp_hires_img != 'undefined' && temp_hires_img ) {       // if this exists then loading of hi-res image is in progress..
       temp_hires_img.src='';      // abort loading hi-res image, abort onload event also
       $(overlay).removeClass("small_loading_indicator");
@@ -481,16 +439,9 @@ function calculateTransform() {
         y: windowCenter.y - imgHalfHeight
     }
 
-}
+  }
 //-- end BLOGIN update
 
-/*
-  // The distance between image edge and window edge
-  var distFromImageEdgeToWindowEdge = {
-    x: windowCenter.x - imgHalfWidth,
-    y: windowCenter.y - imgHalfHeight
-  };
-*/
 
   var scaleHorizontally = distFromImageEdgeToWindowEdge.x / imgHalfWidth;
   var scaleVertically = distFromImageEdgeToWindowEdge.y / imgHalfHeight;
@@ -504,11 +455,10 @@ function calculateTransform() {
   // The additional scale is based on the smaller value of
   // scaling horizontally and scaling vertically
 
-
-  //-- calculate scale
-  if (scaleHorizontally == -1)    // image width was not supplied (data-o-w missing)
+  //-- calculate scale, recover if only one dimension is present (width or height)  
+  if (scaleHorizontally == -1)    // image width was not supplied (data-o-w missing), rely on height, scale vertically
     scale = scaleVertically;
-  else if (scaleVertically == -1)   // image height was not supplied (data-o-h missing)
+  else if (scaleVertically == -1)   // image height was not supplied (data-o-h missing), rely on width, scale horizontally
     scale = scaleHorizontally;
   else                        // both image width and height were supplied, take smaller, to fit viewport
     scale = Math.min(scaleHorizontally, scaleVertically);
