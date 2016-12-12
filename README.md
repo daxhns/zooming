@@ -2,6 +2,8 @@
 
 - limit maximum zoom to original image dimensions
 - loading indicator while original, hi-res image is loading
+- removed additional zoom-in and grab options
+- fixed image flicker on Firefox when updating image src
 
 [Demo](http://hnsmedia.net/zooming/)
 
