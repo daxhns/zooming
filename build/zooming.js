@@ -346,7 +346,7 @@ function calculateTransform() {
   }
 
 
-  var scale_to_use = options.scaleBase;
+  //var scale_to_use = options.scaleBase;
   if (original_width > 0 || original_height > 0){     // should be always true if data-o-w and data-o-h attriutes are present with every data-original attribute
 
     //console.log('original image w: ' + original_width);
@@ -355,11 +355,11 @@ function calculateTransform() {
     if (original_width < window.innerWidth && original_height < window.innerHeight){      // original, full sized image is smaller than screen
       var x_distance_to_edge = original_width;
       var y_distance_to_edge = original_height;
-      scale_to_use = 1;      // reset scale to 1, image is small enough to fit whole on screen, do not scale it down
+      //scale_to_use = 1;      // reset scale to 1, image is small enough to fit whole on screen, do not scale it down
     }
     else{     // original image will not fit on screen, limit to screen size
-      var x_distance_to_edge = window.innerWidth;
-      var y_distance_to_edge = window.innerHeight;
+      var x_distance_to_edge = options.scaleBase * window.innerWidth;     // apply scale factor to outer bounding box, limiting max width and height of the image to the window edge
+      var y_distance_to_edge = options.scaleBase * window.innerHeight;
     }
     //--
 
@@ -369,12 +369,12 @@ function calculateTransform() {
     }
 
   }
-  else{     // original image dimensions could not be determined, scale to full screen (original zooming behaviour)
+  else{     // original image dimensions could not be determined, scale to full screen, even beyond image dimensions (original zooming behaviour)
 
     // The distance between image edge and window edge
     var distFromImageEdgeToWindowEdge = {
-        x: windowCenter.x - imgHalfWidth,
-        y: windowCenter.y - imgHalfHeight
+        x: options.scaleBase * windowCenter.x - imgHalfWidth,
+        y: options.scaleBase * windowCenter.y - imgHalfHeight
     }
 
   }
@@ -400,8 +400,10 @@ function calculateTransform() {
     scale = scaleHorizontally;
   else                        // both image width and height were supplied, take smaller, to fit viewport
     scale = Math.min(scaleHorizontally, scaleVertically);
-  
-  scale = options.scaleBase + scale;    // apply scale factor
+
+  //scale = scale_to_use + scale;    // apply scale factor
+  scale = 1.0 + scale;    // apply scale factor, scale factor calculated in before..
+
 
   return 'translate(' + translate.x + 'px, ' + translate.y + 'px) scale(' + scale + ')';
 }
